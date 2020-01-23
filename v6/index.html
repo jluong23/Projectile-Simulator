@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script type="text/javascript" src = "projectile.js"></script>
+    <script type="text/javascript" src = "marker.js"></script>
+
+	<script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="css\bootstrap.css">
+
+	<title>SUVAT</title>
+
+	<style>
+    #variables{
+        position: absolute;
+        left: 1025px;
+    }
+	.wrapper{
+		position:relative;
+		width: 1330px;
+		height: 650px;
+        border: 5px solid pink;
+	}
+
+    .wrapper canvas{
+        position:absolute;
+    }
+
+    #projectileCanvas{
+        /*background-image: url("assets/bg.jpg");*/
+        /*background-size: 1000px 500px;*/
+        border: 5px solid black;
+    }
+	</style>
+</head>
+
+<body>
+	<h1>Projectile Simulation</h1>
+	<img id = "projectileSimulation">
+	<img src = 'assets/projectile.png' id = 'projectileObject' style ='display: none;'>
+    <img src = 'assets/explosion1.png' id = 'projectileExplosion' style ='display: none;'>
+
+	<div class = "wrapper">
+        <div id = 'variables'>
+            <u>Variables</u><br>
+            u<sub>x</sub> / Horizontal initial velocity <span class = 'range-value'>0</span> ms<sup>-1</sup> <br>
+            <input  class = "input-range" name = "ux" type = "range" min="0" max="70" value = "0" step = 0.1><br>
+
+            u<sub>y</sub> / Vertical initial velocity <span class = 'range-value'>0</span> ms<sup>-1</sup> <br>
+            <input class = "input-range" name = "uy" type = "range" min="0" max="80" value = "0" step = 0.1><br>
+
+            a / Acceleration due to gravity <span class = 'range-value'>-9.81</span>ms<sup>-2</sup><br>
+            <input class = "input-range" name = "a" type = "range" min = "-20" max = "0" value = -9.81 step = 0.01><br>
+
+            h / Initial Height <span class = 'range-value'>0</span>m<br>
+            <input class = "input-range" name = "h" type = "range" min = "0" max = "200" value = 0 step = 0.1><br>
+
+            u / Initial Resultant Velocity <span id = initVelocity>0</span> ms<sup>-1</sup>
+            <hr>
+            <button type ="button" onclick ="fire()">Fire!</button>
+            <button type ="button" onclick ="clearTrail()">Clear</button><br><br>
+
+            <div id = 'times'>
+                <span id = 'CurrentTime'>Current Time: 0 s</span><br>
+                <span id = 'EstimatedTime'>Expected Time: 0 s</span><br>
+            </div>
+            <hr>
+            <div id = 'markerInfo'></div><br>
+        </div>
+
+        <!-- Contents inside canvas tag are shown if the web browser used is not on the updated version -->
+		<canvas id="projectileCanvas" width="1000" height="500">
+	 		Canvas not supported; please update your browser.
+        </canvas>
+
+        <canvas id = "trailCanvas" width="1000" height="500"  onmousemove = "getMousePos(event)">
+            Canvas not supported; please update your browser.
+        </canvas>
+    </div>
+
+<script>
+	var canvas = document.getElementById("projectileCanvas");
+	var ctx = canvas.getContext("2d"); //Get drawing context, getting methods for canvas
+	var trailCanvas = document.getElementById("trailCanvas");
+	var ctx2 = trailCanvas.getContext("2d"); //Get drawing context, getting methods for trail canvas
+	const dt = 0.01665; // Measure of each second, approximated to match real time
+    var animId = 0; //Returned value of requestAnimationFrame. If zero, animation is not running.
+    var allMarkers = []; //array which stores all of the markers on the screen
+
+
+$(document).ready(function() {
+    initialProjectile = new Projectile();
+    initialProjectile.setVariables(); //Get values of sliders
+    initialProjectile.drawProjectile(); //Draw bomb at start with initial variables
+    $('.input-range').on('input', updateInput); //call updateInput if any of the sliders change
+});
+
+function getMousePos(e) {
+    /*
+    Function which is called when the user hovers over a canvas, taking an onmouseover event parameter 'e'
+    and finding the coordinates where the mouse is on the canvas.
+    Proceeds to check if the user is hovering over a marker by caling markerHover
+    */
+    var rect = canvas.getBoundingClientRect(); //offset, finding the correct coordinates on the canvas rather than the whole screen
+    var x = e.clientX-rect.left; var y = Math.round(e.clientY-rect.top);
+    markerHover(x,y);
+}
+
+function markerHover(x,y){
+    //checks whether the user is hovering over a marker,
+    //returning values of the marker to the markerInfo div if hovering.
+
+    var i=0; var r;
+    if (typeof(p) !== "undefined"){ //if p exists
+        while (r = allMarkers[i++]){ //For each marker named r
+            ctx2.beginPath();
+            ctx2.arc(r.x+25,r.yCanvas+25,5, 0, 2*Math.PI); //draw an invisible circle on the marker
+            if (ctx2.isPointInPath(x,y)){ //if the mouse is on a marker, output marker values.
+                $('#markerInfo').html( `
+                    <u>Marker Values</u><br>
+                    Time: ` + r.time +`s<br>
+                    Horizontal Displacement: ` + r.x +`m<br>
+                    Vertical Displacement : ` + r.yVal +`m<br>
+                    Horizontal Velocity: ` + r.vx +`ms<sup>-1</sup><br>
+                    Vertical Velocity: ` + r.vy+`ms<sup>-1</sup><br>
+                    Resultant Velocity: ` + r.v +`ms<sup>-1</sup><br>
+                    `
+                )
+            }
+        }
+    }
+}
+
+function fire(){
+    //Function which is called when the fire button is pressed
+    if (animId == 0){
+        //If an animation is not running, start animating
+        window.t0 = new Date().getTime(); //Starting time of projection
+        window.p = new Projectile;
+        p.setVariables();
+        //t:Math.round(currTime*10) / 10
+        animFrame();
+    }
+    else{
+        //If an animation is running, stop current animation and recall function, starting new animation with current variables on sliders
+        window.cancelAnimationFrame(animId);
+        window.clearInterval(markerId);
+        animId=0;
+        fire();
+    }
+}
+
+function animFrame(){
+    //recursively call self which itself calls startTimer
+    animId = window.requestAnimationFrame(animFrame);
+    startTimer();
+}
+
+function startTimer(){
+    //main loop of animation which is called repeatedly, handling the marker placement, stopping condition of projectile and movement of projectile.
+	t1 = new Date().getTime(); //New time of projectile
+    window.currTime = (t1-t0)/1000; //divide 1000 for ms to s
+
+    //Regular markers placement
+    if (p.markerLoopCalled == false){ //Initially false, this needs only run once to prevent multiple setInterval loops from firing
+        newMarker = new Marker();
+        prevX = 0; prevY = 450; //Previous position of projectile, initially starting position
+        markerId = window.setInterval(function(){
+            dy = p.y-prevY; //Change in y position from 1 second ago
+            dx = p.x-prevX; //Change in x position from 1 second ago
+            distTravelled = Math.sqrt(dx*dx+dy*dy) //From pythagoras theorem, distance travelled
+            if(distTravelled!=0){ //only place a marker if the projectile has moved horizontal distance
+                newMarker.drawMarker(p,false) //false being not a point of maximmum for projectile
+                newMarker.addMarker(p);
+            }
+            prevX = p.x; prevY = p.y; //update new values of previous positions
+
+        },1000); //call function every second
+
+        p.markerLoopCalled = true;
+    }
+
+    //Green maxima markers placement
+    if (p.vy <= 0 && currTime >= 1 && p.maximaReached == false){ //maximaReached is initially false, only ran once to prevent multiple multiple maxima markers from being drawwn.
+        newMarker.drawMarker(p,true); //true being point of maximum for projectile
+        newMarker.addMarker(p);
+        p.maximaReached = true;
+    }
+
+    ////Used for testing, stopping animation at projectile's maxima
+    // if (p.vy<=0){
+    //     endAnim();
+    // }
+
+	if(p.y>450){ //If the projectile has touched the ground. 500 is the floor, but 450 is used as the image is 50x50px
+        endAnim();
+	}
+
+	else{
+		p.moveProjectile();
+        p.drawTrail();
+	}
+
+    if(!document.hasFocus()){ //If focus is lost on the screen (tab out, change window), end the animation.
+        endAnim();
+    }
+    else{
+        // $("#CurrentTime").text("Current Time: " + (currTime)) // Unrounded
+        $("#CurrentTime").text("Current Time: " + Math.round((currTime)*10) / 10 + " s")
+        // rounded result*10 then divide by 10 to round to 1dp
+    }
+}
+
+function endAnim(){
+    window.cancelAnimationFrame(animId); //End animation loop
+    window.clearInterval(markerId); //End regular marker placement loop
+    animId = 0; //Animation has finished
+    p.explode();
+}
+
+function updateInput(){
+    //This procedure is called when a value of a slider is changed
+
+    $(this).prevAll('.range-value:first').html(this.value); //show values of slider when changed
+
+    //create a temporary projectile, setting the variables of the sliders to the projectile attributes
+    tempProjectile = new Projectile();
+    tempProjectile.setVariables();
+
+    $("#EstimatedTime").text("Expected Time: " + tempProjectile.calculateTime() + " s");
+    //Output the expected time of the temporary projectile (values of sliders)
+    $("#initVelocity").text(Math.round(tempProjectile.v*10)/10); //Show calculated resultant velocity of temporary projectile
+
+    if (animId == 0){
+        tempProjectile.drawProjectile(); //Used to draw next projectile when changing initial height
+    }
+}
+
+function clearTrail(){
+    //Procedure which is called when the clear button is pressed
+    if (typeof(p) !== "undefined"){ //reset allMarkers and clear trail only if p exists
+        allMarkers = [];
+        p.clearTrail();
+    }
+}
+</script>
+</body>
+</html>
