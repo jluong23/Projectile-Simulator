@@ -58,7 +58,7 @@ function Projectile(){
         //Function which returns calculated by hand time of projectile flight
 
         // Terms in ax^2+bx+c = 0
-        A = this.a/2;
+        A = this.a;
         B = this.uy;
         C = this.h;
 
